@@ -251,6 +251,79 @@ async function detectModelProvider(modelId, settings) {
 }
 
 // ============================================================================
+// 后端地址自动纠正
+// 配置的地址全部无响应时（常见于默认端口 8080 对上了 LM Studio 的 1234），
+// 按常见端口逐一探测，采纳第一个可达者并写回设置。
+// ============================================================================
+
+const OPENAI_PORT_CANDIDATES = [1234, 8080, 8081, 8000]; // LM Studio / llama.cpp / vLLM
+const OLLAMA_PORT_CANDIDATES = [11434];
+
+async function probeFirstReachable(kind, currentUrl, candidates) {
+    const path = kind === 'openai' ? '/v1/models' : '/api/tags';
+    const current = normalizeServerUrl(currentUrl);
+    for (const port of candidates) {
+        const url = `http://127.0.0.1:${port}`;
+        if (current === url) continue; // 当前地址已探测过，跳过
+        const probe = await probeProvider(`${url}${path}`);
+        if (probe.ok) return url;
+    }
+    return null;
+}
+
+let ensureBackendPromise = null;
+function ensureBackendReachable() {
+    if (!ensureBackendPromise) {
+        ensureBackendPromise = doEnsureBackend().finally(() => { ensureBackendPromise = null; });
+    }
+    return ensureBackendPromise;
+}
+
+async function doEnsureBackend() {
+    let settings = await getSettings();
+    let providers = await detectProviders(settings.ollamaUrl, settings.openaiUrl, settings.provider);
+    if (providers.ollama || providers.openai) {
+        return { settings, providers, adopted: null };
+    }
+
+    // 全部无响应：显式选定的后端可能配错了端口/类型，放宽为两个后端都探测
+    providers = await detectProviders(settings.ollamaUrl, settings.openaiUrl, 'auto');
+
+    const adopted = {};
+    if (!providers.openai) {
+        const url = await probeFirstReachable('openai', settings.openaiUrl, OPENAI_PORT_CANDIDATES);
+        if (url) adopted.openaiUrl = url;
+    }
+    if (!providers.ollama) {
+        const url = await probeFirstReachable('ollama', settings.ollamaUrl, OLLAMA_PORT_CANDIDATES);
+        if (url) adopted.ollamaUrl = url;
+    }
+    if (Object.keys(adopted).length === 0) {
+        return { settings, providers, adopted: null };
+    }
+
+    // 显式选定的后端仍不可达、而另一后端可达时，一并切换 provider
+    const partial = {
+        ollamaUrl: adopted.ollamaUrl || settings.ollamaUrl,
+        openaiUrl: adopted.openaiUrl || settings.openaiUrl
+    };
+    if (settings.provider === 'ollama' && !providers.ollama && adopted.openaiUrl) {
+        partial.provider = 'openai';
+        adopted.provider = 'openai';
+    } else if (settings.provider === 'openai' && !providers.openai && adopted.ollamaUrl) {
+        partial.provider = 'ollama';
+        adopted.provider = 'ollama';
+    }
+
+    await saveSettings(partial);
+    cachedModels = null; // 地址变了，模型列表缓存作废
+    const fresh = await getSettings();
+    providers = await detectProviders(fresh.ollamaUrl, fresh.openaiUrl, fresh.provider);
+    debugLog('后端地址自动纠正:', JSON.stringify(adopted));
+    return { settings: fresh, providers, adopted };
+}
+
+// ============================================================================
 // 翻译调用
 // ============================================================================
 
@@ -576,13 +649,14 @@ browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
 
                 case 'DETECT_PROVIDERS': {
-                    const providers = await detectProviders(settings.ollamaUrl, settings.openaiUrl, settings.provider);
-                    sendResponse(providers);
+                    const { providers, adopted } = await ensureBackendReachable();
+                    sendResponse({ ...providers, adopted });
                     break;
                 }
 
                 case 'LIST_MODELS': {
-                    const models = await listModels(settings, !message.forceRefresh);
+                    const { settings: s } = await ensureBackendReachable();
+                    const models = await listModels(s, !message.forceRefresh);
                     sendResponse({ models });
                     break;
                 }

@@ -66,6 +66,23 @@ async function refreshProviderStatus() {
     const dot = $('providerStatus');
     try {
         const r = await send({ type: 'DETECT_PROVIDERS' });
+        // 后端地址被自动纠正（如默认 8080 扫不到、探测到 LM Studio 在 1234）——同步界面并刷新模型
+        if (r && r.adopted) {
+            if (r.adopted.openaiUrl) {
+                settings.openaiUrl = r.adopted.openaiUrl;
+                $('openaiUrl').value = r.adopted.openaiUrl;
+            }
+            if (r.adopted.ollamaUrl) {
+                settings.ollamaUrl = r.adopted.ollamaUrl;
+                $('ollamaUrl').value = r.adopted.ollamaUrl;
+            }
+            if (r.adopted.provider) {
+                settings.provider = r.adopted.provider;
+                $('providerSelect').value = r.adopted.provider;
+            }
+            showToast('已自动连接后端 ' + Object.values(r.adopted).filter(v => String(v).startsWith('http')).join('、'));
+            loadModels(true);
+        }
         const anyOk = r && (r.ollama || r.openai);
         const anyBlocked = r && (r.ollama_blocked || r.openai_blocked);
         if (anyOk) {
@@ -76,7 +93,7 @@ async function refreshProviderStatus() {
             dot.title = '后端可达但可能被 CORS 拦截（Ollama 需设置 OLLAMA_ORIGINS）';
         } else {
             dot.className = 'status-dot err';
-            dot.title = '未检测到后端：请启动 Ollama / llama.cpp / LM Studio';
+            dot.title = `未检测到后端。已扫描 Ollama ${settings.ollamaUrl} 与 OpenAI 兼容 ${settings.openaiUrl}（含常见端口自动探测），均无响应。请确认推理服务已启动。`;
         }
     } catch (e) {
         dot.className = 'status-dot err';
