@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Local LLM Translator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="../icons/icon48.png" alt="" class="logo" width="26" height="26">
+      <div class="titles">
+        <h1>Local LLM Translator</h1>
+        <p class="subtitle">本地大模型网页翻译</p>
+      </div>
+      <div class="status-dot" id="providerStatus" title="检测中…"></div>
+    </header>
+
+    <section class="main-controls">
+      <div class="form-group">
+        <label for="modelTrigger">模型</label>
+        <div class="picker" id="modelPicker">
+          <button type="button" id="modelTrigger" class="picker-trigger" aria-haspopup="listbox" aria-expanded="false" disabled>
+            <span id="modelTriggerLabel" class="picker-label">加载模型中…</span>
+            <svg class="caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="modelMenu" class="picker-menu" hidden>
+            <input type="text" id="modelSearch" class="picker-search" placeholder="搜索模型…" autocomplete="off" spellcheck="false">
+            <ul id="modelList" class="picker-list" role="listbox"></ul>
+            <div class="picker-empty" id="modelEmpty" hidden>未发现模型<br><small>请确认后端已启动</small></div>
+          </div>
+        </div>
+        <button id="refreshModels" class="icon-btn" title="刷新模型列表">↻</button>
+      </div>
+
+      <div class="form-group">
+        <label for="langTrigger">目标语言</label>
+        <div class="picker" id="langPicker">
+          <button type="button" id="langTrigger" class="picker-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span id="langTriggerLabel" class="picker-label">中文</span>
+            <svg class="caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="langMenu" class="picker-menu" hidden>
+            <input type="text" id="langSearch" class="picker-search" placeholder="搜索语言…" autocomplete="off" spellcheck="false">
+            <ul id="langList" class="picker-list" role="listbox"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>显示方式</label>
+        <div class="segmented" id="displayModeSeg">
+          <button type="button" data-mode="replace" class="active">替换原文</button>
+          <button type="button" data-mode="bilingual">段落对照</button>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="translateBtn" class="primary-btn" disabled>
+          <span id="translateBtnText">翻译网页</span>
+        </button>
+        <button id="cancelBtn" class="danger-btn" hidden title="停止翻译">✕</button>
+        <button id="restoreBtn" class="secondary-btn" title="还原原文">还原</button>
+      </div>
+    </section>
+
+    <section class="quick-toggle">
+      <button type="button" id="toggleQuick" class="toggle-btn">
+        <span>快捷设置</span><span class="toggle-arrow">▼</span>
+      </button>
+    </section>
+
+    <section class="quick-settings" id="quickSection" hidden>
+      <div class="form-group">
+        <label for="providerSelect">后端</label>
+        <select id="providerSelect">
+          <option value="auto">自动检测</option>
+          <option value="ollama">Ollama</option>
+          <option value="openai">OpenAI 兼容（llama.cpp / LM Studio）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="ollamaUrl">Ollama 地址</label>
+        <input type="text" id="ollamaUrl" placeholder="http://127.0.0.1:11434">
+      </div>
+      <div class="form-group">
+        <label for="openaiUrl">OpenAI 兼容地址</label>
+        <input type="text" id="openaiUrl" placeholder="http://127.0.0.1:8080">
+        <div class="preset-chips">
+          <button type="button" class="chip" data-url="http://127.0.0.1:8080">llama.cpp :8080</button>
+          <button type="button" class="chip" data-url="http://127.0.0.1:1234">LM Studio :1234</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="cacheMode">译文缓存</label>
+        <select id="cacheMode">
+          <option value="off">不缓存</option>
+          <option value="session">浏览器关闭前保留</option>
+          <option value="persistent">跨会话保留</option>
+        </select>
+        <button type="button" id="clearCache" class="text-btn">清空缓存（<span id="cacheCount">…</span> 条）</button>
+      </div>
+      <div class="form-group">
+        <div class="checkbox-row">
+          <input type="checkbox" id="autoTranslatePages">
+          <label for="autoTranslatePages">打开外语页面时自动翻译</label>
+        </div>
+        <p class="hint">需要「所有网站」访问权限；可在选项页管理排除语言/站点。</p>
+      </div>
+      <div class="button-row">
+        <button id="saveQuick" class="primary-btn small">保存设置</button>
+        <button id="openOptions" class="secondary-btn small">更多设置</button>
+      </div>
+    </section>
+
+    <footer>
+      <p>所有翻译均在本机完成，数据不会离开你的电脑。</p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="../languages.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

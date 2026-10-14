@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Local LLM Translator 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img src="../icons/icon48.png" alt="" width="28" height="28">
+      <h1>Local LLM Translator 设置</h1>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>后端与模型</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="providerSelect">后端</label>
+            <select id="providerSelect">
+              <option value="auto">自动检测</option>
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI 兼容（llama.cpp / LM Studio / vLLM）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="requestFormat">请求格式</label>
+            <select id="requestFormat">
+              <option value="auto">自动（按模型名判断）</option>
+              <option value="default">default（JSON 批处理）</option>
+              <option value="simple">simple（精简 JSON 提示）</option>
+              <option value="translategemma">translategemma（官方提示词）</option>
+              <option value="hunyuan">hunyuan（Hunyuan-MT）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ollamaUrl">Ollama 地址</label>
+            <input type="text" id="ollamaUrl" placeholder="http://127.0.0.1:11434">
+          </div>
+          <div class="field">
+            <label for="openaiUrl">OpenAI 兼容地址</label>
+            <input type="text" id="openaiUrl" placeholder="http://127.0.0.1:8080">
+          </div>
+          <div class="field">
+            <label for="numCtx">Ollama num_ctx（0 = 模型默认）</label>
+            <input type="number" id="numCtx" min="0" step="512">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>翻译行为</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="targetLanguage">目标语言</label>
+            <select id="targetLanguage"></select>
+          </div>
+          <div class="field">
+            <label for="sourceLanguage">源语言</label>
+            <select id="sourceLanguage">
+              <option value="auto">自动（按页面 lang 属性）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="displayMode">显示方式</label>
+            <select id="displayMode">
+              <option value="replace">替换原文</option>
+              <option value="bilingual">段落对照（原文下方插译文）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="temperature">采样温度</label>
+            <input type="number" id="temperature" min="0" max="2" step="0.1">
+          </div>
+          <div class="field">
+            <label for="maxConcurrentRequests">并发请求数（1–32）</label>
+            <input type="number" id="maxConcurrentRequests" min="1" max="32" step="1">
+          </div>
+          <div class="field">
+            <label for="maxItemsPerBatch">每批条数</label>
+            <input type="number" id="maxItemsPerBatch" min="1" max="32" step="1">
+          </div>
+          <div class="field">
+            <label for="maxCharsPerBatch">每批字符上限</label>
+            <input type="number" id="maxCharsPerBatch" min="200" max="8000" step="100">
+          </div>
+          <div class="field">
+            <label for="maxOutputRetries">畸形输出重试次数</label>
+            <input type="number" id="maxOutputRetries" min="0" max="5" step="1">
+          </div>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="useStructuredOutput">
+            优先使用 JSON Schema 结构化输出（服务器不支持时自动降级）</label>
+          <label class="check"><input type="checkbox" id="plainTextFallback">
+            批量失败后逐条纯文本兜底</label>
+          <label class="check"><input type="checkbox" id="autoTranslateNewContent">
+            翻译后自动翻译动态新增内容（无限滚动页面）</label>
+          <label class="check"><input type="checkbox" id="autoTranslatePages">
+            打开外语页面时自动翻译（需要「所有网站」权限）</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>自动翻译排除项</h2>
+        <p class="desc">仅当「打开外语页面时自动翻译」开启时生效。页面声明的语言命中排除列表、或站点命中排除列表时，不做自动翻译。</p>
+        <div class="grid">
+          <div class="field">
+            <label for="neverLanguages">排除语言（逗号分隔的语言代码，如 ja, ko）</label>
+            <input type="text" id="neverLanguages" placeholder="ja, ko">
+          </div>
+          <div class="field">
+            <label for="neverSites">排除站点（每行一个域名，含子域名，如 example.com）</label>
+            <textarea id="neverSites" rows="4" placeholder="example.com&#10;docs.example.org"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>译文缓存</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="cacheMode">缓存策略</label>
+            <select id="cacheMode">
+              <option value="off">不缓存</option>
+              <option value="session">浏览器关闭前保留</option>
+              <option value="persistent">跨会话保留</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" id="clearCache" class="text-btn">清空缓存（当前 <span id="cacheCount">…</span> 条）</button>
+      </section>
+
+      <section class="card">
+        <h2>提示词模板（default 格式）</h2>
+        <p class="desc">支持变量：<code>{{targetLanguage}}</code> <code>{{sourceLang}}</code> <code>{{texts}}</code>。留空使用内置模板。</p>
+        <div class="field">
+          <label for="systemPrompt">System 提示词</label>
+          <textarea id="systemPrompt" rows="5"></textarea>
+        </div>
+        <div class="field">
+          <label for="userPrompt">User 提示词</label>
+          <textarea id="userPrompt" rows="3"></textarea>
+        </div>
+        <button type="button" id="resetPrompts" class="text-btn">恢复默认提示词</button>
+      </section>
+
+      <section class="card">
+        <h2>调试</h2>
+        <label class="check"><input type="checkbox" id="debug"> 启用详细日志（控制台输出 [LLMT] 前缀）</label>
+      </section>
+
+      <div class="actions">
+        <button id="saveBtn" class="primary-btn">保存设置</button>
+        <button id="resetBtn" class="secondary-btn">恢复默认</button>
+        <span id="savedTip" class="saved-tip" hidden>已保存 ✓</span>
+      </div>
+    </main>
+
+    <footer>
+      <p>Local LLM Translator · 所有翻译均在本机完成 · 设计参考 <a href="https://github.com/Eldoprano/offline-browser-translate" target="_blank" rel="noreferrer">offline-browser-translate</a></p>
+    </footer>
+  </div>
+
+  <script src="../languages.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
