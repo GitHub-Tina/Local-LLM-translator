@@ -377,8 +377,10 @@ document.querySelectorAll('#displayModeSeg button').forEach(btn => {
 });
 
 document.querySelectorAll('.preset-chips .chip').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
         $('openaiUrl').value = chip.dataset.url;
+        // 点击预设即保存并刷新模型，避免"填了地址忘了保存"导致仍扫旧端口
+        await saveQuickSettings();
     });
 });
 
